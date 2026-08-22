@@ -70,6 +70,7 @@
         </div>
         <div id="error-msg">Invalid JSON</div>
         <div class="controls">
+            <button class="secondary" onclick="document.getElementById('info-modal').style.display='flex'">📖 Info & Use Cases</button>
             <button class="secondary" onclick="document.getElementById('json-input').value = '{}'; renderGraph();">Clear</button>
             <button onclick="renderGraph()">Render Atlas</button>
         </div>
@@ -81,6 +82,33 @@
             <div class="legend-item"><div class="dot" style="background: var(--node-obj)"></div> Object</div>
             <div class="legend-item"><div class="dot" style="background: var(--node-arr)"></div> Array</div>
             <div class="legend-item"><div class="dot" style="background: var(--node-val)"></div> Value</div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="info-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:100; justify-content:center; align-items:center;">
+        <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 700px; max-height: 85vh; overflow-y: auto; padding: 2rem; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); padding-bottom:1rem; margin-bottom:1rem;">
+                <h2 style="margin:0; color: var(--text);">How JSON Atlas Works</h2>
+                <button class="secondary" style="width:auto; padding:0.5rem 1rem;" onclick="document.getElementById('info-modal').style.display='none'">Close</button>
+            </div>
+            
+            <h3 style="color: var(--primary);">🧠 Guide for a Dummy</h3>
+            <p style="color: #a1a1aa; line-height: 1.6; font-size: 0.95rem;">
+                Imagine you are looking at a giant family tree, but instead of people, it's computer data. 
+                Computers send data in a format called "JSON", which looks like a massive, unreadable wall of text full of brackets <code>{}</code> and <code>[]</code>.
+                JSON Atlas takes that wall of text, figures out exactly who is related to who, and draws lines between them. 
+                Instead of reading text, you can visually drag, zoom, and explore the data as a physical map!
+            </p>
+
+            <h3 style="color: var(--primary); margin-top: 2rem;">💼 5 Real-Life Use Cases</h3>
+            <ul style="color: #a1a1aa; line-height: 1.6; font-size: 0.95rem;">
+                <li style="margin-bottom: 0.5rem;"><strong>1. API Debugging (Engineer):</strong> You query a third-party API (like Stripe or GitHub) and get a 50,000-line JSON response. Instead of scrolling endlessly, you paste it here to instantly map out the exact location of the nested <code>user.billing.subscription.status</code> key you are trying to extract.</li>
+                <li style="margin-bottom: 0.5rem;"><strong>2. Database Schema Planning (PM/Engineer):</strong> When designing a new NoSQL database (like MongoDB), you can write a sample JSON document and visualize it to see if the hierarchy makes logical sense to your team before actually writing code.</li>
+                <li style="margin-bottom: 0.5rem;"><strong>3. Explaining Technical Debt (PM):</strong> A Product Manager can take a bloated legacy API response, map it in JSON Atlas, and visually show stakeholders why the system is too complex and requires refactoring, simply by showing how massive and tangled the node graph looks.</li>
+                <li style="margin-bottom: 0.5rem;"><strong>4. Writing Documentation (Engineer):</strong> Instead of writing out boring tables explaining what an API returns, you can screenshot the physical topology of the JSON response to include in your API documentation.</li>
+                <li style="margin-bottom: 0.5rem;"><strong>5. Frontend UI State Mapping (Engineer/PM):</strong> Modern web apps use huge "State Trees" (like Redux) to manage what the user sees. You can paste your entire app state here to visually verify if data is leaking into the wrong components.</li>
+            </ul>
         </div>
     </div>
 
