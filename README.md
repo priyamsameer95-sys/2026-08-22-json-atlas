@@ -1,14 +1,41 @@
 # JSON Atlas
 
-A highly sophisticated, privacy-first, fully local JSON interactive visualizer.
+**Paste any JSON → Get typed code for TypeScript, Python, and Go.**
 
-## The Problem
-Reading massive, nested JSON payloads from APIs is a nightmare. Existing visualizers either require you to upload your sensitive company data to a random server, or they are too simplistic.
+A free, privacy-first code generator that runs entirely in your browser. No accounts, no servers, no data collection.
 
-## The Solution
-JSON Atlas recursively parses your JSON into an Abstract Syntax Tree (AST) and renders it instantly as a physics-based, draggable node-graph using Vis.js. 
+## What it does
 
-It handles Arrays, Objects, and Leaf Values with distinct topologies. It completely runs client-side in the browser, meaning your data never leaves your machine.
+1. You paste a JSON payload (an API response, a database document, a config file)
+2. JSON Atlas infers the types of every field — distinguishing `int` vs `float`, detecting nullable fields, resolving arrays of objects
+3. It generates production-ready typed code in three languages:
+   - **TypeScript** — `interface` definitions
+   - **Python** — `@dataclass` classes with type hints
+   - **Go** — `struct` types with `json:"tag"` annotations
+
+## Why this exists
+
+Every developer has done this: you get a JSON response from an API, and you need to write a typed struct/interface/class to deserialize it. You end up manually reading the JSON and writing types by hand. This tool automates that entirely.
+
+The existing tools (like JSONCrack) put code generation behind a paywall. JSON Atlas does it for free.
+
+## Features
+
+- Smart type inference (int vs float, nullable, nested objects, arrays of objects)
+- Format / Minify / Copy / Clear toolbar
+- Live JSON validation as you type
+- One-click copy of generated code
+- Sample data loader for quick demo
+- File size and line count stats
 
 ## Usage
-Simply open `index.html`, paste your JSON, and explore the interactive atlas map of your data architecture.
+
+1. Open `index.html` in any browser
+2. Paste your JSON in the left panel
+3. Click **Generate Code →**
+4. Switch between TypeScript / Python / Go tabs
+5. Click **Copy** to grab the code
+
+## License
+
+Public domain. Use however you want.

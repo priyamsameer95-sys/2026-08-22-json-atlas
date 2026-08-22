@@ -1,11 +1,12 @@
-// ─── STATE ───
-let network = null;
-let allNodes = [];
-let allEdges = [];
-let pathMap = {};  // nodeId → json path string
+// ═══════════════════════════════════════════════
+//  JSON ATLAS — Type Inference & Code Generation
+// ═══════════════════════════════════════════════
 
-// ─── CORE: PARSE & BUILD GRAPH ───
-function renderGraph() {
+let currentTab = 'ts';
+let generatedCode = { ts: '', py: '', go: '' };
+
+// ─── ENTRY POINT ───
+function generate() {
     const raw = document.getElementById('json-input').value;
     const errEl = document.getElementById('error-msg');
 
@@ -19,245 +20,342 @@ function renderGraph() {
         return;
     }
 
-    allNodes = [];
-    allEdges = [];
-    pathMap = {};
-    let idCounter = 1;
-    let stats = { obj: 0, arr: 0, val: 0, maxDepth: 0 };
+    updateStats(raw);
 
-    function walk(key, value, parentId, path, depth) {
-        const id = idCounter++;
-        if (depth > stats.maxDepth) stats.maxDepth = depth;
+    // Collect all named types
+    const typeRegistry = [];
+    inferType(data, 'Root', typeRegistry);
 
-        let label, color, shape;
+    generatedCode.ts = emitTypeScript(typeRegistry);
+    generatedCode.py = emitPython(typeRegistry);
+    generatedCode.go = emitGo(typeRegistry);
 
-        if (Array.isArray(value)) {
-            stats.arr++;
-            label = key !== null ? key + ' [ ]' : 'Array [ ]';
-            color = '#f472b6';
-            shape = 'box';
-        } else if (value !== null && typeof value === 'object') {
-            stats.obj++;
-            label = key !== null ? key + ' { }' : 'Root { }';
-            color = '#a78bfa';
-            shape = 'box';
-        } else {
-            stats.val++;
-            let v = String(value);
-            if (v.length > 25) v = v.slice(0, 25) + '…';
-            label = (key !== null ? key + ': ' : '') + v;
-            color = '#34d399';
-            shape = 'box';
-        }
+    document.getElementById('out-ts').textContent = generatedCode.ts;
+    document.getElementById('out-py').textContent = generatedCode.py;
+    document.getElementById('out-go').textContent = generatedCode.go;
+}
 
-        allNodes.push({
-            id: id,
-            label: label,
-            color: { background: color, border: color, highlight: { background: '#fff', border: color } },
-            font: { color: '#fff', face: 'monospace', size: 13 },
-            shape: shape,
-            borderWidth: 2,
-            borderWidthSelected: 3,
-            margin: 10
-        });
+// ═══════════════════════════════════════════════
+//  TYPE INFERENCE ENGINE
+// ═══════════════════════════════════════════════
 
-        pathMap[id] = path;
-
-        if (parentId !== null) {
-            allEdges.push({
-                from: parentId,
-                to: id,
-                color: { color: '#333', highlight: '#666' },
-                arrows: { to: { enabled: true, scaleFactor: 0.5 } },
-                width: 1.5,
-                smooth: { type: 'cubicBezier', forceDirection: 'horizontal', roundness: 0.4 }
-            });
-        }
-
-        if (Array.isArray(value)) {
-            value.forEach((item, i) => {
-                walk('[' + i + ']', item, id, path + '[' + i + ']', depth + 1);
-            });
-        } else if (value !== null && typeof value === 'object') {
-            Object.keys(value).forEach(k => {
-                walk(k, value[k], id, path + '.' + k, depth + 1);
-            });
-        }
+function inferType(value, suggestedName, registry) {
+    if (value === null) return { kind: 'null' };
+    if (typeof value === 'boolean') return { kind: 'bool' };
+    if (typeof value === 'string') return { kind: 'string' };
+    if (typeof value === 'number') {
+        return { kind: Number.isInteger(value) ? 'int' : 'float' };
     }
 
-    walk(null, data, null, '$', 0);
+    if (Array.isArray(value)) {
+        if (value.length === 0) return { kind: 'array', element: { kind: 'unknown' } };
 
-    // Update stats display
-    document.getElementById('stat-obj').textContent = stats.obj;
-    document.getElementById('stat-arr').textContent = stats.arr;
-    document.getElementById('stat-val').textContent = stats.val;
-    document.getElementById('stat-depth').textContent = stats.maxDepth;
-    document.getElementById('stat-size').textContent = formatBytes(raw.length);
+        // Infer element type from first element; use singular name
+        const elemName = singularize(suggestedName);
+        const elemType = inferType(value[0], elemName, registry);
 
-    // Build vis.js network
-    const container = document.getElementById('network');
-    const graphData = {
-        nodes: new vis.DataSet(allNodes),
-        edges: new vis.DataSet(allEdges)
-    };
-
-    const options = {
-        layout: {
-            hierarchical: {
-                direction: 'LR',
-                sortMethod: 'directed',
-                nodeSpacing: 60,
-                levelSeparation: 220,
-                treeSpacing: 80
+        // If there are multiple objects, merge their keys for a more complete type
+        if (elemType.kind === 'ref' && value.length > 1) {
+            const existing = registry.find(t => t.name === elemType.ref);
+            if (existing) {
+                for (let i = 1; i < value.length; i++) {
+                    if (value[i] !== null && typeof value[i] === 'object' && !Array.isArray(value[i])) {
+                        mergeObjectFields(existing, value[i], registry);
+                    }
+                }
             }
-        },
-        physics: {
-            hierarchicalRepulsion: { nodeDistance: 90, centralGravity: 0 },
-            stabilization: { iterations: 150 }
-        },
-        interaction: {
-            dragNodes: true,
-            hover: true,
-            tooltipDelay: 100,
-            zoomView: true,
-            dragView: true
-        },
-        nodes: {
-            borderWidth: 2,
-            shadow: { enabled: true, color: 'rgba(0,0,0,0.3)', size: 8, x: 2, y: 2 }
         }
-    };
 
-    if (network) network.destroy();
-    network = new vis.Network(container, graphData, options);
+        return { kind: 'array', element: elemType };
+    }
 
-    // Click handler → show JSON path
-    network.on('click', function (params) {
-        const panel = document.getElementById('path-panel');
-        if (params.nodes.length > 0) {
-            const nodeId = params.nodes[0];
-            const path = pathMap[nodeId] || '$';
-            document.getElementById('path-display').textContent = path;
-            panel.style.display = 'block';
+    if (typeof value === 'object') {
+        const typeName = pascalCase(suggestedName);
+        const fields = [];
+
+        for (const key of Object.keys(value)) {
+            const childName = pascalCase(key);
+            const childType = inferType(value[key], childName, registry);
+            fields.push({ key: key, type: childType });
+        }
+
+        const typeEntry = { name: typeName, fields: fields };
+        registry.push(typeEntry);
+        return { kind: 'ref', ref: typeName };
+    }
+
+    return { kind: 'unknown' };
+}
+
+function mergeObjectFields(typeEntry, obj, registry) {
+    for (const key of Object.keys(obj)) {
+        const exists = typeEntry.fields.find(f => f.key === key);
+        if (!exists) {
+            const childName = pascalCase(key);
+            const childType = inferType(obj[key], childName, registry);
+            typeEntry.fields.push({ key: key, type: childType, optional: true });
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════
+//  EMITTERS
+// ═══════════════════════════════════════════════
+
+// ── TypeScript ──
+function emitTypeScript(registry) {
+    const lines = ['// Generated by JSON Atlas', '// https://priyamsameer95-sys.github.io/2026-08-22-json-atlas/', ''];
+
+    for (const type of registry) {
+        lines.push(`interface ${type.name} {`);
+        for (const field of type.fields) {
+            const opt = field.optional ? '?' : '';
+            const nullable = field.type.kind === 'null';
+            lines.push(`  ${safeKey(field.key)}${opt}: ${tsType(field.type)};`);
+        }
+        lines.push('}');
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+function tsType(t) {
+    if (t.kind === 'string') return 'string';
+    if (t.kind === 'int' || t.kind === 'float') return 'number';
+    if (t.kind === 'bool') return 'boolean';
+    if (t.kind === 'null') return 'null';
+    if (t.kind === 'unknown') return 'unknown';
+    if (t.kind === 'ref') return t.ref;
+    if (t.kind === 'array') return `${tsType(t.element)}[]`;
+    return 'unknown';
+}
+
+// ── Python ──
+function emitPython(registry) {
+    const lines = [
+        '# Generated by JSON Atlas',
+        '# https://priyamsameer95-sys.github.io/2026-08-22-json-atlas/',
+        '',
+        'from __future__ import annotations',
+        'from dataclasses import dataclass',
+        'from typing import Optional',
+        ''
+    ];
+
+    // Emit in reverse so dependencies come first
+    const reversed = [...registry].reverse();
+
+    for (const type of reversed) {
+        lines.push('@dataclass');
+        lines.push(`class ${type.name}:`);
+        if (type.fields.length === 0) {
+            lines.push('    pass');
         } else {
-            panel.style.display = 'none';
+            for (const field of type.fields) {
+                const pyT = pyType(field.type);
+                const annotation = field.optional ? `Optional[${pyT}]` : (field.type.kind === 'null' ? `Optional[${pyT}]` : pyT);
+                lines.push(`    ${safeSnake(field.key)}: ${annotation}`);
+            }
         }
-    });
+        lines.push('');
+    }
+
+    return lines.join('\n');
 }
 
-// ─── SEARCH ───
-function searchNodes(query) {
-    if (!network || allNodes.length === 0) return;
-    const q = query.toLowerCase().trim();
-
-    const updates = allNodes.map(node => {
-        const matches = q && node.label.toLowerCase().includes(q);
-        const originalColor = node.color.background;
-        return {
-            id: node.id,
-            color: {
-                background: (q === '') ? originalColor : (matches ? '#fbbf24' : originalColor),
-                border: (q === '') ? originalColor : (matches ? '#fbbf24' : originalColor)
-            },
-            font: {
-                color: (q === '') ? '#fff' : (matches ? '#000' : 'rgba(255,255,255,0.25)'),
-                face: 'monospace', size: 13
-            },
-            opacity: (q === '') ? 1 : (matches ? 1 : 0.3)
-        };
-    });
-
-    network.body.data.nodes.update(updates);
+function pyType(t) {
+    if (t.kind === 'string') return 'str';
+    if (t.kind === 'int') return 'int';
+    if (t.kind === 'float') return 'float';
+    if (t.kind === 'bool') return 'bool';
+    if (t.kind === 'null') return 'None';
+    if (t.kind === 'unknown') return 'object';
+    if (t.kind === 'ref') return t.ref;
+    if (t.kind === 'array') return `list[${pyType(t.element)}]`;
+    return 'object';
 }
 
-// ─── TOOLBAR ACTIONS ───
+// ── Go ──
+function emitGo(registry) {
+    const lines = [
+        '// Generated by JSON Atlas',
+        '// https://priyamsameer95-sys.github.io/2026-08-22-json-atlas/',
+        '',
+        'package main',
+        ''
+    ];
+
+    // Emit in reverse so dependencies come first
+    const reversed = [...registry].reverse();
+
+    for (const type of reversed) {
+        lines.push(`type ${type.name} struct {`);
+        for (const field of type.fields) {
+            const goFieldName = pascalCase(field.key);
+            const goT = goType(field.type, field.type.kind === 'null');
+            const tag = '`json:"' + field.key + '"`';
+            // Align with padding
+            const padName = goFieldName.padEnd(16);
+            const padType = goT.padEnd(16);
+            lines.push(`\t${padName}${padType}${tag}`);
+        }
+        lines.push('}');
+        lines.push('');
+    }
+
+    return lines.join('\n');
+}
+
+function goType(t, nullable) {
+    const ptr = nullable ? '*' : '';
+    if (t.kind === 'string') return ptr + 'string';
+    if (t.kind === 'int') return ptr + 'int';
+    if (t.kind === 'float') return ptr + 'float64';
+    if (t.kind === 'bool') return ptr + 'bool';
+    if (t.kind === 'null') return 'interface{}';
+    if (t.kind === 'unknown') return 'interface{}';
+    if (t.kind === 'ref') return ptr + t.ref;
+    if (t.kind === 'array') return '[]' + goType(t.element, false);
+    return 'interface{}';
+}
+
+// ═══════════════════════════════════════════════
+//  UI ACTIONS
+// ═══════════════════════════════════════════════
+
+function switchTab(tab, btn) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.output-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+    // Reset copy button
+    const copyBtn = document.getElementById('copy-btn');
+    copyBtn.textContent = 'Copy';
+    copyBtn.classList.remove('copied');
+}
+
+function copyOutput() {
+    const code = generatedCode[currentTab];
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    }).catch(() => {});
+}
+
 function formatJSON() {
     const el = document.getElementById('json-input');
-    try {
-        const obj = JSON.parse(el.value);
-        el.value = JSON.stringify(obj, null, 2);
-        liveValidate();
-    } catch (e) { /* ignore */ }
+    try { el.value = JSON.stringify(JSON.parse(el.value), null, 2); liveValidate(); } catch (e) {}
 }
 
 function minifyJSON() {
     const el = document.getElementById('json-input');
-    try {
-        const obj = JSON.parse(el.value);
-        el.value = JSON.stringify(obj);
-        liveValidate();
-    } catch (e) { /* ignore */ }
-}
-
-function copyJSON() {
-    const el = document.getElementById('json-input');
-    navigator.clipboard.writeText(el.value).catch(() => {});
-}
-
-function downloadJSON() {
-    const el = document.getElementById('json-input');
-    const blob = new Blob([el.value], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'data.json';
-    a.click();
-    URL.revokeObjectURL(a.href);
+    try { el.value = JSON.stringify(JSON.parse(el.value)); liveValidate(); } catch (e) {}
 }
 
 function loadSample() {
     document.getElementById('json-input').value = JSON.stringify({
-        "order": {
-            "id": "ORD-9182",
-            "customer": { "name": "Jane Doe", "email": "jane@example.com", "tier": "premium" },
-            "items": [
-                { "sku": "WDG-001", "name": "Dashboard Widget", "qty": 2, "price": 29.99 },
-                { "sku": "PLG-044", "name": "Analytics Plugin", "qty": 1, "price": 79.00 }
-            ],
-            "shipping": { "method": "express", "address": { "city": "San Francisco", "state": "CA", "zip": "94105" } },
-            "total": 138.98,
-            "status": "shipped"
+        "user": {
+            "id": 1042,
+            "name": "Jane Doe",
+            "email": "jane@example.com",
+            "is_active": true,
+            "role": null
+        },
+        "orders": [
+            {
+                "order_id": "ORD-881",
+                "total": 129.99,
+                "items": [
+                    { "sku": "WDG-01", "name": "Widget Pro", "qty": 2, "price": 49.99 },
+                    { "sku": "PLG-07", "name": "Plugin Basic", "qty": 1, "price": 30.01 }
+                ],
+                "shipped": true
+            }
+        ],
+        "settings": {
+            "theme": "dark",
+            "notifications": { "email": true, "sms": false, "push": true }
         }
     }, null, 2);
     liveValidate();
-    renderGraph();
+    generate();
 }
 
 function clearAll() {
-    document.getElementById('json-input').value = '{}';
+    document.getElementById('json-input').value = '';
     document.getElementById('error-msg').style.display = 'none';
-    document.getElementById('path-panel').style.display = 'none';
-    document.getElementById('search-input').value = '';
-    document.getElementById('stat-obj').textContent = '0';
-    document.getElementById('stat-arr').textContent = '0';
-    document.getElementById('stat-val').textContent = '0';
-    document.getElementById('stat-depth').textContent = '0';
-    document.getElementById('stat-size').textContent = '0';
-    if (network) { network.destroy(); network = null; }
+    document.getElementById('stat-line').textContent = '';
+    document.getElementById('out-ts').textContent = '// Click "Generate Code →" to see TypeScript interfaces';
+    document.getElementById('out-py').textContent = '# Click "Generate Code →" to see Python dataclasses';
+    document.getElementById('out-go').textContent = '// Click "Generate Code →" to see Go structs';
+    generatedCode = { ts: '', py: '', go: '' };
 }
 
-// ─── LIVE VALIDATION ───
 function liveValidate() {
     const raw = document.getElementById('json-input').value;
     const errEl = document.getElementById('error-msg');
-    try {
-        JSON.parse(raw);
-        errEl.style.display = 'none';
-    } catch (e) {
+    if (!raw.trim()) { errEl.style.display = 'none'; return; }
+    try { JSON.parse(raw); errEl.style.display = 'none'; } catch (e) {
         errEl.textContent = '✕ ' + e.message;
         errEl.style.display = 'block';
     }
 }
 
-// ─── MODAL ───
 function openModal() { document.getElementById('help-modal').style.display = 'flex'; }
 function closeModal() { document.getElementById('help-modal').style.display = 'none'; }
 
-// ─── UTIL ───
-function formatBytes(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(1) + ' MB';
+// ═══════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════
+
+function updateStats(raw) {
+    const bytes = new Blob([raw]).size;
+    let size = bytes < 1024 ? bytes + ' B' : (bytes / 1024).toFixed(1) + ' KB';
+    const lines = raw.split('\n').length;
+    document.getElementById('stat-line').textContent = `${lines} lines · ${size}`;
+}
+
+function pascalCase(str) {
+    return str
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .split(' ')
+        .filter(Boolean)
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join('');
+}
+
+function safeKey(key) {
+    // If key has special chars, wrap in quotes
+    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key)) return key;
+    return '"' + key + '"';
+}
+
+function safeSnake(key) {
+    // Convert to snake_case for Python
+    let s = key.replace(/[^a-zA-Z0-9]/g, '_').replace(/([A-Z])/g, '_$1').toLowerCase();
+    s = s.replace(/^_+/, '').replace(/_+/g, '_');
+    if (!s) s = 'field';
+    // Avoid Python reserved words
+    const reserved = ['class', 'def', 'return', 'import', 'from', 'if', 'else', 'for', 'while', 'try', 'except', 'with', 'as', 'pass', 'type'];
+    if (reserved.includes(s)) s = s + '_';
+    return s;
+}
+
+function singularize(name) {
+    // Very basic singularization for type naming
+    if (name.endsWith('ies')) return name.slice(0, -3) + 'y';
+    if (name.endsWith('ses')) return name.slice(0, -2);
+    if (name.endsWith('s') && !name.endsWith('ss')) return name.slice(0, -1);
+    return name + 'Item';
 }
 
 // ─── INIT ───
-window.onload = renderGraph;
+window.onload = function () {
+    liveValidate();
+    generate();
+};
