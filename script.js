@@ -1,4 +1,4 @@
-let network = null;
+let Graph = null;
 
 function renderGraph() {
     const input = document.getElementById('json-input').value;
@@ -15,49 +15,32 @@ function renderGraph() {
     }
 
     const nodes = [];
-    const edges = [];
+    const links = [];
     let idCounter = 1;
 
     function traverse(key, value, parentId) {
         const currentId = idCounter++;
-        let label = key !== null ? String(key) : '';
-        let color = '#10b981'; // value color
-        let shape = 'box';
-        let fontColor = '#ffffff';
+        let label = key !== null ? String(key) : 'Root';
+        let color = '#34d399'; // value color
 
         if (Array.isArray(value)) {
             label = key !== null ? `${key} []` : 'Array []';
-            color = '#ec4899';
-            shape = 'hexagon';
+            color = '#f472b6';
         } else if (value !== null && typeof value === 'object') {
             label = key !== null ? `${key} {}` : 'Object {}';
-            color = '#8b5cf6';
-            shape = 'ellipse';
+            color = '#a78bfa';
         } else {
-            // Leaf node: format value
             let valStr = String(value);
             if (valStr.length > 20) valStr = valStr.substring(0, 20) + '...';
             label = key !== null ? `${key}: ${valStr}` : valStr;
         }
 
-        nodes.push({
-            id: currentId,
-            label: label,
-            color: { background: color, border: color },
-            font: { color: fontColor, face: 'monospace' },
-            shape: shape
-        });
+        nodes.push({ id: currentId, name: label, color: color });
 
         if (parentId !== null) {
-            edges.push({
-                from: parentId,
-                to: currentId,
-                color: { color: '#3f3f46' },
-                arrows: 'to'
-            });
+            links.push({ source: parentId, target: currentId });
         }
 
-        // Recursion
         if (Array.isArray(value)) {
             value.forEach((item, index) => {
                 traverse(`[${index}]`, item, currentId);
@@ -69,41 +52,35 @@ function renderGraph() {
         }
     }
 
-    // Start traversal
     traverse(null, data, null);
 
-    // Initialize Network
     const container = document.getElementById('network');
-    const graphData = {
-        nodes: new vis.DataSet(nodes),
-        edges: new vis.DataSet(edges)
-    };
-    
-    const options = {
-        layout: {
-            hierarchical: {
-                direction: 'LR',
-                sortMethod: 'directed',
-                nodeSpacing: 100,
-                levelSeparation: 250
-            }
-        },
-        physics: {
-            hierarchicalRepulsion: {
-                nodeDistance: 120
-            }
-        },
-        interaction: {
-            dragNodes: true,
-            hover: true
-        }
-    };
+    container.innerHTML = ''; // Clear old canvas
 
-    if (network) {
-        network.destroy();
-    }
-    network = new vis.Network(container, graphData, options);
+    Graph = ForceGraph3D()(container)
+        .graphData({ nodes, links })
+        .nodeColor(node => node.color)
+        .nodeRelSize(6)
+        .linkColor(() => 'rgba(255,255,255,0.2)')
+        .nodeThreeObject(node => {
+            const sprite = new SpriteText(node.name);
+            sprite.color = '#ffffff';
+            sprite.textHeight = 4;
+            // Background for text visibility
+            sprite.backgroundColor = 'rgba(0,0,0,0.6)';
+            sprite.padding = 2;
+            sprite.borderRadius = 2;
+            return sprite;
+        })
+        .nodeThreeObjectExtend(true);
 }
 
 // Initial render
 window.onload = renderGraph;
+// Handle window resize
+window.addEventListener('resize', () => {
+    if(Graph) {
+        Graph.width(document.getElementById('graph-container').clientWidth)
+             .height(document.getElementById('graph-container').clientHeight);
+    }
+});
