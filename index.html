@@ -3,11 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON Atlas - 3D Visualizer</title>
-    <!-- 3D Force Graph & Three.js -->
-    <script src="https://unpkg.com/three"></script>
-    <script src="https://unpkg.com/three-spritetext"></script>
-    <script src="https://unpkg.com/3d-force-graph"></script>
+    <title>JSON Atlas - Interactive Visualizer</title>
+    <!-- Vis Network 2D -->
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
         :root {
             --bg: #050505;
@@ -51,8 +49,8 @@
 <body>
     <div id="sidebar">
         <div class="sidebar-header">
-            <h1>JSON Atlas 3D</h1>
-            <p>Paste complex JSON payloads to render a fully interactive, physics-based 3D topology.</p>
+            <h1>JSON Atlas</h1>
+            <p>Paste complex JSON payloads to render a fully interactive, physics-based topology.</p>
         </div>
         <div id="editor-container">
             <textarea id="json-input" spellcheck="false">{
@@ -81,7 +79,7 @@
         <div class="controls">
             <button onclick="document.getElementById('info-modal').style.display='flex'">Help</button>
             <button onclick="document.getElementById('json-input').value = '{}'; renderGraph();">Clear</button>
-            <button class="primary" onclick="renderGraph()">Render 3D</button>
+            <button class="primary" onclick="renderGraph()">Render Atlas</button>
         </div>
     </div>
     
@@ -104,26 +102,26 @@
             
             <h3 style="color: var(--primary);">🤔 What Does This Tool Do?</h3>
             <p style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem;">
-                Computers communicate using massive, nested text files called "JSON". Reading these files manually is incredibly difficult because they are just walls of brackets. <strong>JSON Atlas</strong> acts as a compiler that parses this raw text and renders it into a fully interactive, physics-based 3D universe. It maps the topology of the data—showing exactly how objects, arrays, and values are interconnected in a spatial graph.
+                Computers communicate using massive, nested text files called "JSON". Reading these files manually is incredibly difficult because they are just walls of brackets. <strong>JSON Atlas</strong> acts as a compiler that parses this raw text and renders it into a fully interactive, physics-based 2D universe. It maps the topology of the data—showing exactly how objects, arrays, and values are interconnected in a spatial graph.
             </p>
 
             <h3 style="color: var(--node-obj);">💻 Use Cases for Engineers</h3>
             <ul style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem;">
                 <li style="margin-bottom: 0.75rem;"><strong>API Debugging:</strong> When querying complex third-party APIs (like Stripe, AWS, or GitHub) and receiving 50,000+ line responses, engineers can paste the payload here to instantly locate nested keys visually rather than scrolling through endless text.</li>
                 <li style="margin-bottom: 0.75rem;"><strong>Frontend State Mapping:</strong> Modern web apps use massive state trees (e.g., Redux). Engineers can dump the application state into the Atlas to verify data flow and spot memory leaks or misconfigurations visually.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Documentation Generation:</strong> Replace dry, tabular API documentation with rich, 3D spatial screenshots of the API's actual topological structure.</li>
+                <li style="margin-bottom: 0.75rem;"><strong>Documentation Generation:</strong> Replace dry, tabular API documentation with rich, spatial screenshots of the API's actual topological structure.</li>
             </ul>
 
             <h3 style="color: var(--node-arr);">📊 Use Cases for Product Managers</h3>
             <ul style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem;">
-                <li style="margin-bottom: 0.75rem;"><strong>Database Schema Planning:</strong> Before committing engineering resources to build a NoSQL database (like MongoDB), PMs can visualize sample data structures in 3D to ensure the hierarchy logically aligns with business requirements.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Explaining Technical Debt:</strong> By visualizing a bloated, legacy API response in 3D, PMs can effectively communicate to non-technical stakeholders why a system is overly complex and requires immediate refactoring.</li>
+                <li style="margin-bottom: 0.75rem;"><strong>Database Schema Planning:</strong> Before committing engineering resources to build a NoSQL database (like MongoDB), PMs can visualize sample data structures to ensure the hierarchy logically aligns with business requirements.</li>
+                <li style="margin-bottom: 0.75rem;"><strong>Explaining Technical Debt:</strong> By visualizing a bloated, legacy API response, PMs can effectively communicate to non-technical stakeholders why a system is overly complex and requires immediate refactoring.</li>
             </ul>
 
             <h3 style="color: #ef4444;">⚠️ Challenges</h3>
             <ul style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 1rem;">
-                <li style="margin-bottom: 0.75rem;"><strong>Performance Limits:</strong> Rendering a physics simulation for 3D graphs requires WebGL. If a JSON payload exceeds 10,000 nodes, the browser may experience frame drops or run out of memory.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Screen Real Estate:</strong> Extremely wide arrays or deeply nested objects can clump together in the physics engine, requiring the user to manually drag nodes apart to read overlapping text sprites.</li>
+                <li style="margin-bottom: 0.75rem;"><strong>Performance Limits:</strong> Rendering a physics simulation for graphs requires compute power. If a JSON payload exceeds 10,000 nodes, the browser may experience frame drops or run out of memory.</li>
+                <li style="margin-bottom: 0.75rem;"><strong>Screen Real Estate:</strong> Extremely wide arrays or deeply nested objects can clump together in the physics engine, requiring the user to manually drag nodes apart to read overlapping text.</li>
                 <li style="margin-bottom: 0.75rem;"><strong>Data Parsing:</strong> Syntax errors in the pasted JSON string will cause the parser to fail entirely, requiring users to manually fix missing commas or quotes before visualization can occur.</li>
             </ul>
         </div>
