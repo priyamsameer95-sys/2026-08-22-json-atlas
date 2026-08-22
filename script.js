@@ -55,24 +55,29 @@ function renderGraph() {
     traverse(null, data, null);
 
     const container = document.getElementById('network');
-    container.innerHTML = ''; // Clear old canvas
+    const width = document.getElementById('graph-container').clientWidth;
+    const height = document.getElementById('graph-container').clientHeight;
 
-    Graph = ForceGraph3D()(container)
-        .graphData({ nodes, links })
-        .nodeColor(node => node.color)
-        .nodeRelSize(6)
-        .linkColor(() => 'rgba(255,255,255,0.2)')
-        .nodeThreeObject(node => {
-            const sprite = new SpriteText(node.name);
-            sprite.color = '#ffffff';
-            sprite.textHeight = 4;
-            // Background for text visibility
-            sprite.backgroundColor = 'rgba(0,0,0,0.6)';
-            sprite.padding = 2;
-            sprite.borderRadius = 2;
-            return sprite;
-        })
-        .nodeThreeObjectExtend(true);
+    if (!Graph) {
+        Graph = ForceGraph3D()(container)
+            .width(width)
+            .height(height)
+            .nodeColor(node => node.color)
+            .nodeRelSize(6)
+            .linkColor(() => 'rgba(255,255,255,0.2)')
+            .nodeThreeObject(node => {
+                const sprite = new SpriteText(node.name);
+                sprite.color = '#ffffff';
+                sprite.textHeight = 4;
+                sprite.backgroundColor = 'rgba(0,0,0,0.6)';
+                sprite.padding = 2;
+                sprite.borderRadius = 2;
+                return sprite;
+            })
+            .nodeThreeObjectExtend(true);
+    }
+
+    Graph.graphData({ nodes, links });
 }
 
 // Initial render
