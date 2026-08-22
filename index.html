@@ -3,130 +3,237 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON Atlas - Interactive Visualizer</title>
-    <!-- Vis Network 2D -->
+    <title>JSON Atlas — Visualize, Search & Explore Any JSON</title>
+    <meta name="description" content="Free, privacy-first JSON visualizer. Paste any JSON and instantly see it as an interactive node graph. Search nodes, view paths, format, minify, and export.">
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         :root {
-            --bg: #050505;
-            --panel: rgba(15, 15, 15, 0.6);
-            --border: rgba(255, 255, 255, 0.1);
-            --text: #e4e4e7;
-            --primary: #38bdf8;
-            --node-obj: #a78bfa;
-            --node-arr: #f472b6;
-            --node-val: #34d399;
+            --bg: #0a0a0a;
+            --surface: #141414;
+            --surface2: #1c1c1c;
+            --border: #2a2a2a;
+            --text: #e5e5e5;
+            --text2: #888;
+            --accent: #6366f1;
+            --accent-glow: rgba(99,102,241,0.3);
+            --green: #34d399;
+            --pink: #f472b6;
+            --purple: #a78bfa;
+            --red: #f87171;
+            --yellow: #fbbf24;
+            --radius: 10px;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; display: flex; height: 100vh; overflow: hidden; }
-        
-        /* Glassmorphism Sidebar */
-        #sidebar { width: 380px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
-        .sidebar-header { padding: 2rem 1.5rem; border-bottom: 1px solid var(--border); }
-        .sidebar-header h1 { margin: 0; font-size: 1.8rem; font-weight: 800; letter-spacing: -0.5px; background: linear-gradient(135deg, #38bdf8, #818cf8, #a78bfa); -webkit-background-clip: text; color: transparent; text-transform: uppercase; }
-        .sidebar-header p { margin: 0.5rem 0 0 0; font-size: 0.85rem; color: #a1a1aa; line-height: 1.4; }
-        
-        #editor-container { flex: 1; padding: 1.5rem; display: flex; flex-direction: column; }
-        textarea { flex: 1; background: rgba(0,0,0,0.4); color: #d4d4d8; border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; font-family: 'SF Mono', Consolas, monospace; font-size: 0.85rem; resize: none; outline: none; transition: border-color 0.3s, box-shadow 0.3s; line-height: 1.5; }
-        textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); color: #fff; }
-        
-        .controls { padding: 1.5rem; border-top: 1px solid var(--border); display: flex; gap: 0.75rem; flex-wrap: wrap; }
-        button { flex: 1; min-width: 120px; background: rgba(255, 255, 255, 0.05); color: #fff; border: 1px solid var(--border); padding: 0.8rem; border-radius: 8px; font-weight: 600; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 1px; backdrop-filter: blur(10px); }
-        button:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.3); }
-        button.primary { background: var(--primary); border: none; color: #000; }
-        button.primary:hover { background: #0ea5e9; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
-        
-        #error-msg { color: #f87171; font-size: 0.85rem; padding: 0 1.5rem 1rem 1.5rem; margin-top: -0.5rem; display: none; font-family: monospace; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
 
-        #graph-container { flex: 1; background: var(--bg); position: relative; }
-        #network { width: 100%; height: 100%; outline: none; cursor: crosshair; }
-        
-        /* Glassmorphism Legend */
-        .legend { position: absolute; bottom: 2rem; right: 2rem; background: var(--panel); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; color: #a1a1aa; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-        .legend-item { display: flex; align-items: center; gap: 0.75rem; }
-        .dot { width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+        /* ── LAYOUT ── */
+        .app { display: flex; height: 100vh; }
+        .sidebar { width: 420px; min-width: 420px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+        .canvas-area { flex: 1; position: relative; background: var(--bg); }
+
+        /* ── HEADER ── */
+        .header { padding: 20px 20px 16px; border-bottom: 1px solid var(--border); }
+        .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+        .brand svg { width: 28px; height: 28px; }
+        .brand h1 { font-size: 1.25rem; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+        .tagline { font-size: 0.8rem; color: var(--text2); line-height: 1.4; }
+
+        /* ── TOOLBAR ── */
+        .toolbar { display: flex; gap: 4px; padding: 10px 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+        .toolbar button { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .toolbar button:hover { background: #252525; color: #fff; border-color: #444; }
+        .toolbar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* ── SEARCH ── */
+        .search-bar { padding: 10px 20px; border-bottom: 1px solid var(--border); }
+        .search-bar input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; outline: none; }
+        .search-bar input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+        .search-bar input::placeholder { color: #555; }
+
+        /* ── EDITOR ── */
+        .editor-wrap { flex: 1; padding: 12px 20px; display: flex; flex-direction: column; overflow: hidden; }
+        .editor-wrap textarea { flex: 1; width: 100%; background: var(--bg); color: #c4c4c4; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace; font-size: 0.82rem; line-height: 1.55; resize: none; outline: none; tab-size: 2; }
+        .editor-wrap textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); color: #fff; }
+
+        /* ── STATS BAR ── */
+        .stats-bar { display: flex; gap: 16px; padding: 8px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); font-size: 0.72rem; color: var(--text2); font-weight: 500; flex-wrap: wrap; }
+        .stat { display: flex; align-items: center; gap: 5px; }
+        .stat .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+        /* ── ERROR ── */
+        .error-bar { padding: 0 20px; }
+        .error-bar p { color: var(--red); font-size: 0.78rem; font-family: monospace; padding: 8px 0; display: none; }
+
+        /* ── BOTTOM BUTTONS ── */
+        .action-row { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
+        .action-row button { flex: 1; padding: 10px; border-radius: 8px; font-weight: 700; font-size: 0.82rem; cursor: pointer; transition: all 0.15s; border: none; }
+        .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border) !important; }
+        .btn-secondary:hover { background: #252525; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: #4f46e5; box-shadow: 0 0 20px var(--accent-glow); }
+
+        /* ── CANVAS ── */
+        #network { width: 100%; height: 100%; }
+
+        /* ── FLOATING PANELS ── */
+        .float-panel { position: absolute; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; font-size: 0.78rem; box-shadow: 0 8px 30px rgba(0,0,0,0.4); z-index: 5; }
+        .legend-panel { bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .legend-panel .row { display: flex; align-items: center; gap: 8px; color: var(--text2); font-weight: 500; }
+        .legend-panel .row .swatch { width: 12px; height: 12px; border-radius: 3px; }
+
+        .path-panel { top: 20px; right: 20px; max-width: 500px; display: none; }
+        .path-panel code { background: var(--bg); padding: 6px 10px; border-radius: 6px; display: block; font-size: 0.82rem; color: var(--accent); word-break: break-all; margin-top: 6px; }
+        .path-panel .label { color: var(--text2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.7rem; }
+
+        /* ── MODAL ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 50; justify-content: center; align-items: center; }
+        .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; width: 90%; max-width: 720px; max-height: 82vh; overflow-y: auto; padding: 32px; box-shadow: 0 25px 60px rgba(0,0,0,0.5); }
+        .modal h2 { font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; color: #fff; }
+        .modal .subtitle { color: var(--text2); font-size: 0.88rem; margin-bottom: 24px; line-height: 1.5; }
+        .modal h3 { font-size: 0.95rem; font-weight: 700; margin: 24px 0 10px; display: flex; align-items: center; gap: 8px; }
+        .modal ul { color: var(--text2); line-height: 1.7; font-size: 0.88rem; padding-left: 20px; }
+        .modal li { margin-bottom: 8px; }
+        .modal li strong { color: var(--text); }
+        .modal-close { position: sticky; top: 0; float: right; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.8rem; }
+        .modal-close:hover { background: #333; }
+
+        /* ── SCROLLBAR ── */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
     </style>
 </head>
 <body>
-    <div id="sidebar">
-        <div class="sidebar-header">
-            <h1>JSON Atlas</h1>
-            <p>Paste complex JSON payloads to render a fully interactive, physics-based topology.</p>
+<div class="app">
+    <!-- ── SIDEBAR ── -->
+    <div class="sidebar">
+        <div class="header">
+            <div class="brand">
+                <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="#6366f1" stroke-width="2.5"/><circle cx="16" cy="10" r="3" fill="#a78bfa"/><circle cx="10" cy="22" r="3" fill="#f472b6"/><circle cx="22" cy="22" r="3" fill="#34d399"/><line x1="16" y1="13" x2="10" y2="19" stroke="#444" stroke-width="1.5"/><line x1="16" y1="13" x2="22" y2="19" stroke="#444" stroke-width="1.5"/></svg>
+                <h1>JSON Atlas</h1>
+            </div>
+            <p class="tagline">Paste → Visualize → Search → Export. Everything runs locally in your browser.</p>
         </div>
-        <div id="editor-container">
-            <textarea id="json-input" spellcheck="false">{
-  "system": "Atlas Core",
-  "status": "online",
-  "modules": [
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+            <button onclick="formatJSON()">Format</button>
+            <button onclick="minifyJSON()">Minify</button>
+            <button onclick="copyJSON()">Copy</button>
+            <button onclick="downloadJSON()">Download</button>
+            <button onclick="loadSample()">Sample</button>
+            <button onclick="openModal()">Help</button>
+        </div>
+
+        <!-- Search -->
+        <div class="search-bar">
+            <input type="text" id="search-input" placeholder="Search keys or values…" oninput="searchNodes(this.value)">
+        </div>
+
+        <!-- Editor -->
+        <div class="editor-wrap">
+            <textarea id="json-input" spellcheck="false" oninput="liveValidate()">{
+  "company": "Acme Corp",
+  "employees": 142,
+  "departments": [
     {
-      "id": "neural_net",
-      "active": true,
-      "parameters": {
-        "learning_rate": 0.001,
-        "layers": 64
-      }
+      "name": "Engineering",
+      "headcount": 58,
+      "teams": ["Frontend", "Backend", "Platform"]
     },
     {
-      "id": "quantum_bridge",
-      "active": false,
-      "parameters": {
-        "entanglement": "stable"
-      }
+      "name": "Product",
+      "headcount": 22,
+      "teams": ["Growth", "Core"]
     }
-  ]
+  ],
+  "config": {
+    "region": "us-east-1",
+    "feature_flags": {
+      "dark_mode": true,
+      "beta_access": false
+    }
+  }
 }</textarea>
         </div>
-        <div id="error-msg">Invalid JSON</div>
-        <div class="controls">
-            <button onclick="document.getElementById('info-modal').style.display='flex'">Help</button>
-            <button onclick="document.getElementById('json-input').value = '{}'; renderGraph();">Clear</button>
-            <button class="primary" onclick="renderGraph()">Render Atlas</button>
+
+        <!-- Stats -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat"><div class="dot" style="background:var(--purple)"></div> <span id="stat-obj">0</span> Objects</div>
+            <div class="stat"><div class="dot" style="background:var(--pink)"></div> <span id="stat-arr">0</span> Arrays</div>
+            <div class="stat"><div class="dot" style="background:var(--green)"></div> <span id="stat-val">0</span> Values</div>
+            <div class="stat">Depth: <span id="stat-depth">0</span></div>
+            <div class="stat">Size: <span id="stat-size">0</span></div>
+        </div>
+
+        <!-- Error -->
+        <div class="error-bar"><p id="error-msg"></p></div>
+
+        <!-- Actions -->
+        <div class="action-row">
+            <button class="btn-secondary" onclick="clearAll()">Clear</button>
+            <button class="btn-primary" onclick="renderGraph()">Visualize</button>
         </div>
     </div>
-    
-    <div id="graph-container">
+
+    <!-- ── CANVAS ── -->
+    <div class="canvas-area">
         <div id="network"></div>
-        <div class="legend">
-            <div class="legend-item"><div class="dot" style="background: var(--node-obj); color: var(--node-obj);"></div> Object</div>
-            <div class="legend-item"><div class="dot" style="background: var(--node-arr); color: var(--node-arr);"></div> Array</div>
-            <div class="legend-item"><div class="dot" style="background: var(--node-val); color: var(--node-val);"></div> Value</div>
+
+        <!-- Legend -->
+        <div class="float-panel legend-panel">
+            <div class="row"><div class="swatch" style="background:var(--purple)"></div> Object { }</div>
+            <div class="row"><div class="swatch" style="background:var(--pink)"></div> Array [ ]</div>
+            <div class="row"><div class="swatch" style="background:var(--green)"></div> Value</div>
+        </div>
+
+        <!-- Path Breadcrumb -->
+        <div class="float-panel path-panel" id="path-panel">
+            <div class="label">JSON Path</div>
+            <code id="path-display">$</code>
         </div>
     </div>
+</div>
 
-    <!-- Info Modal -->
-    <div id="info-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); backdrop-filter: blur(5px); z-index:100; justify-content:center; align-items:center;">
-        <div style="background: #18181b; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto; padding: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:1.5rem; margin-bottom:1.5rem;">
-                <h2 style="margin:0; color: #fff; font-size: 1.8rem; font-weight: 800;">📖 JSON Atlas Guide</h2>
-                <button style="width:auto; padding:0.5rem 1rem; border:none; background: #27272a; color: #fff; border-radius: 6px; cursor: pointer;" onclick="document.getElementById('info-modal').style.display='none'">Close</button>
-            </div>
-            
-            <h3 style="color: var(--primary);">🤔 What Does This Tool Do?</h3>
-            <p style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem;">
-                Computers communicate using massive, nested text files called "JSON". Reading these files manually is incredibly difficult because they are just walls of brackets. <strong>JSON Atlas</strong> acts as a compiler that parses this raw text and renders it into a fully interactive, physics-based 2D universe. It maps the topology of the data—showing exactly how objects, arrays, and values are interconnected in a spatial graph.
-            </p>
+<!-- ── HELP MODAL ── -->
+<div class="modal-overlay" id="help-modal">
+    <div class="modal">
+        <button class="modal-close" onclick="closeModal()">Close</button>
+        <h2>JSON Atlas</h2>
+        <p class="subtitle">A free, privacy-first JSON visualizer that turns raw data into interactive node graphs. Everything runs locally in your browser — your data never leaves your machine.</p>
 
-            <h3 style="color: var(--node-obj);">💻 Use Cases for Engineers</h3>
-            <ul style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem;">
-                <li style="margin-bottom: 0.75rem;"><strong>API Debugging:</strong> When querying complex third-party APIs (like Stripe, AWS, or GitHub) and receiving 50,000+ line responses, engineers can paste the payload here to instantly locate nested keys visually rather than scrolling through endless text.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Frontend State Mapping:</strong> Modern web apps use massive state trees (e.g., Redux). Engineers can dump the application state into the Atlas to verify data flow and spot memory leaks or misconfigurations visually.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Documentation Generation:</strong> Replace dry, tabular API documentation with rich, spatial screenshots of the API's actual topological structure.</li>
-            </ul>
+        <h3 style="color:var(--accent)">🤔 What does this tool do?</h3>
+        <ul>
+            <li>Paste any JSON payload and instantly see its structure as a draggable, zoomable node graph.</li>
+            <li><strong>Search</strong> across all keys and values — matching nodes are highlighted in real-time.</li>
+            <li><strong>Click any node</strong> to see its full JSON Path (e.g. <code>$.departments[0].teams</code>).</li>
+            <li><strong>Format, Minify, Copy, Download</strong> your JSON with one click.</li>
+            <li><strong>Stats dashboard</strong> shows object count, array count, value count, nesting depth, and file size.</li>
+        </ul>
 
-            <h3 style="color: var(--node-arr);">📊 Use Cases for Product Managers</h3>
-            <ul style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 2rem;">
-                <li style="margin-bottom: 0.75rem;"><strong>Database Schema Planning:</strong> Before committing engineering resources to build a NoSQL database (like MongoDB), PMs can visualize sample data structures to ensure the hierarchy logically aligns with business requirements.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Explaining Technical Debt:</strong> By visualizing a bloated, legacy API response, PMs can effectively communicate to non-technical stakeholders why a system is overly complex and requires immediate refactoring.</li>
-            </ul>
+        <h3 style="color:var(--purple)">💻 Use cases for Engineers</h3>
+        <ul>
+            <li><strong>API Debugging:</strong> Paste a 50,000-line Stripe or AWS response. Click any node to see the exact JSON Path you need to extract in your code.</li>
+            <li><strong>State Tree Inspection:</strong> Dump your Redux/Zustand state and visually verify data flow, spot stale data, or find misplaced keys.</li>
+            <li><strong>Schema Validation:</strong> Before writing a parser, visualize the actual shape of the data to confirm it matches your expectations.</li>
+        </ul>
 
-            <h3 style="color: #ef4444;">⚠️ Challenges</h3>
-            <ul style="color: #a1a1aa; line-height: 1.7; font-size: 1rem; margin-bottom: 1rem;">
-                <li style="margin-bottom: 0.75rem;"><strong>Performance Limits:</strong> Rendering a physics simulation for graphs requires compute power. If a JSON payload exceeds 10,000 nodes, the browser may experience frame drops or run out of memory.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Screen Real Estate:</strong> Extremely wide arrays or deeply nested objects can clump together in the physics engine, requiring the user to manually drag nodes apart to read overlapping text.</li>
-                <li style="margin-bottom: 0.75rem;"><strong>Data Parsing:</strong> Syntax errors in the pasted JSON string will cause the parser to fail entirely, requiring users to manually fix missing commas or quotes before visualization can occur.</li>
-            </ul>
-        </div>
+        <h3 style="color:var(--pink)">📊 Use cases for Product Managers</h3>
+        <ul>
+            <li><strong>Data Model Reviews:</strong> Visualize proposed database schemas in team meetings without reading raw text.</li>
+            <li><strong>Technical Debt Demos:</strong> Show stakeholders a tangled, overly-nested API response to justify a refactoring sprint.</li>
+            <li><strong>Vendor Evaluation:</strong> Compare the complexity of two competing API responses side-by-side by visualizing each one.</li>
+        </ul>
+
+        <h3 style="color:var(--yellow)">⚠️ Known limitations</h3>
+        <ul>
+            <li><strong>Large payloads:</strong> The physics engine may slow down above ~5,000 nodes. For massive files, consider a streaming viewer.</li>
+            <li><strong>Flat arrays:</strong> Very wide arrays can clump together — drag nodes apart to separate them.</li>
+            <li><strong>Syntax errors:</strong> Invalid JSON will show an error with the exact line/column. Fix it in the editor before visualizing.</li>
+        </ul>
     </div>
+</div>
 
-    <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
